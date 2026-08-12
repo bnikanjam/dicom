@@ -678,6 +678,14 @@ func (r *reader) readBytes(t tag.Tag, vr string, vl uint32) (Value, error) {
 		return nil, ErrorExpectedDefinedLength
 	}
 
+	// Refuse to allocate more than the reader can supply. make([]byte, vl)
+	// below runs before io.ReadFull discovers the bytes are absent, so a
+	// declared length is otherwise an allocation primitive (#349). The reader
+	// already knows its remaining bytes here.
+	if left := r.rawReader.BytesLeftUntilLimit(); left != dicomio.LimitReadUntilEOF && int64(vl) > left {
+		return nil, dicomio.ErrorInsufficientBytesLeft
+	}
+
 	// TODO: add special handling of PixelData
 	if vr == vrraw.OtherByte || vr == vrraw.Unknown {
 		data := make([]byte, vl)
